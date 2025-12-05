@@ -3,6 +3,8 @@ uvicorn[standard]==0.32.0
 pydantic==2.9.2
 numpy==1.26.4
 scipy==1.13.0
+networkx>=2.8
 packaging>=21.0
+setuptools>=65.0
 scikit-fuzzy @ git+https://github.com/scikit-fuzzy/scikit-fuzzy.git@master
 python-multipart==0.0.9
