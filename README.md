@@ -1,66 +1,51 @@
 # 🧠 Student Stress Detector - Backend API
 
-FastAPI backend using Mamdani Fuzzy Inference System to analyze student stress levels.
+A high-performance FastAPI backend utilizing a **Mamdani Fuzzy Inference System** to analyze and quantify student stress levels based on lifestyle and academic metrics.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-yellow)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-green)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-## 🚀 Quick Start
+## 📋 Overview
+This API accepts quantitative inputs regarding a student's daily routine (sleep, workload, screen time, etc.) and processes them through a fuzzy logic engine to determine a crisp stress percentage and a qualitative stress label. It is designed to be easily consumed by frontend applications or mobile apps.
 
-### Local Development
+## 🛠️ Tech Stack
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+- **Framework:** FastAPI (Python)
+- **Logic Engine:** scikit-fuzzy, NumPy
+- **Validation:** Pydantic
+- **Server:** Uvicorn (ASGI)
 
-2. **Run the server:**
-   ```bash
-   uvicorn main:app --reload --port 8000
-   ```
+## 🚀 Installation & Setup
 
-3. **Test the API:**
-   - Health check: http://localhost:8000/api/health
-   - API docs: http://localhost:8000/docs
-   - Calculate stress: POST to http://localhost:8000/api/calculate-stress
+### Prerequisites
+- Python 3.10 or higher
+- pip (Python Package Installer)
 
-### Deploy to Render
+### 1. Install Dependencies
+Navigate to the project directory and install the required packages:
 
-1. **Push to GitHub:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/stressed-backend.git
-   git push -u origin main
-   ```
+```bash
+pip install -r requirements.txt
+````
 
-2. **Deploy on Render:**
-   - Go to [Render Dashboard](https://dashboard.render.com)
-   - Click "New +" → "Web Service"
-   - Connect your GitHub repository
-   - Render will auto-detect `render.yaml` and configure everything
-   - Click "Create Web Service"
+### 2\. Run the Server
 
-3. **Done!** Your API will be live at: `https://your-app-name.onrender.com`
+Start the development server using Uvicorn:
 
-## 📊 API Endpoints
-
-### GET `/`
-Returns API information.
-
-**Response:**
-```json
-{
-  "message": "Student Stress Detector API - Fuzzy Logic System"
-}
+```bash
+uvicorn main:app --reload --port 8000
 ```
 
-### GET `/api/health`
-Health check endpoint.
+The API will be available at `http://localhost:8000`.
 
-**Response:**
+## 📚 API Documentation
+
+### Health Check
+
+**GET** `/api/health`
+Verifies that the API and the Fuzzy System are operational.
+
 ```json
 {
   "status": "healthy",
@@ -68,10 +53,13 @@ Health check endpoint.
 }
 ```
 
-### POST `/api/calculate-stress`
-Calculate stress level based on input parameters.
+### Calculate Stress
+
+**POST** `/api/calculate-stress`
+The core endpoint. Processes input parameters to return analysis.
 
 **Request Body:**
+
 ```json
 {
   "sleep": 7,
@@ -82,18 +70,18 @@ Calculate stress level based on input parameters.
 ```
 
 **Response:**
+
 ```json
 {
   "stress_percentage": 50.0,
   "stress_label": "Moderate Stress",
   "membership_degrees": {
-    "sleep": {...},
-    "workload": {...},
-    "screentime": {...},
-    "extracurricular": {...},
-    "stress": {...}
+    "sleep": { "low": 0.0, "medium": 0.8, "high": 0.2 },
+    "workload": { "low": 0.0, "medium": 1.0, "high": 0.0 },
+    "screentime": { "low": 0.2, "medium": 0.8, "high": 0.0 },
+    "extracurricular": { "low": 0.0, "balanced": 1.0, "excessive": 0.0 },
+    "stress": { "low": 0.0, "moderate": 1.0, "high": 0.0 }
   },
-  "input_values": {...},
   "fuzzy_details": {
     "inference_type": "Mamdani",
     "defuzzification": "centroid",
@@ -102,51 +90,47 @@ Calculate stress level based on input parameters.
 }
 ```
 
-## 🧮 Fuzzy Logic System
+## 🧮 Fuzzy Logic Architecture
+
+The system uses specific membership functions to categorize continuous input data.
 
 ### Input Variables
-- **Sleep Hours** (0-12h): Poor, Moderate, Good
-- **Academic Workload** (0-10): Low, Medium, High
-- **Screen Time** (0-16h): Low, Moderate, High
-- **Extracurricular Activities** (0-10): Low, Balanced, Excessive
+
+| Variable | Range | Linguistic Terms |
+| :--- | :--- | :--- |
+| **Sleep Hours** | 0-12h | Poor, Moderate, Good |
+| **Academic Workload** | 0-10 | Low, Medium, High |
+| **Screen Time** | 0-16h | Low, Moderate, High |
+| **Extracurriculars** | 0-10 | Low, Balanced, Excessive |
 
 ### Output Variable
-- **Stress Level** (0-100%): Very Low, Low, Moderate, High, Very High
 
-### Fuzzy Rules (21 total)
-Examples:
-- Poor sleep + High workload → Very High Stress
-- Good sleep + Low workload + Balanced activities → Very Low Stress
-- High screentime + High workload → Very High Stress
+| Variable | Range | Linguistic Terms |
+| :--- | :--- | :--- |
+| **Stress Level** | 0-100% | Very Low, Low, Moderate, High, Very High |
 
-### Defuzzification
-Uses **centroid method** to convert fuzzy output to crisp stress percentage.
+### Inference & Defuzzification
 
-## 📦 Tech Stack
+  - **Rules:** 21 defined fuzzy rules (e.g., *If Sleep is Poor AND Workload is High, THEN Stress is Very High*).
+  - **Method:** Centroid defuzzification is used to convert the aggregate fuzzy set into a precise numerical value.
 
-- **FastAPI** - Modern Python web framework
-- **scikit-fuzzy** - Fuzzy logic toolkit
-- **NumPy** - Numerical computing
-- **Pydantic** - Data validation
-- **Uvicorn** - ASGI server
+## 📂 Project Structure
 
-## 🔧 Configuration Files
+  - `main.py`: Entry point for the FastAPI application.
+  - `requirements.txt`: List of Python dependencies.
+  - `.gitignore`: Standard Git ignore rules.
 
-- `main.py` - FastAPI application
-- `requirements.txt` - Python dependencies
-- `runtime.txt` - Python version for deployment
-- `render.yaml` - Render deployment configuration
-- `Procfile` - Railway deployment configuration
-- `.gitignore` - Git ignore rules
+## 🌐 CORS Configuration
 
-## 🌐 CORS
-
-CORS is enabled for all origins (`allow_origins=["*"]`) to allow frontend access from any domain.
+Cross-Origin Resource Sharing (CORS) is configured to allow all origins (`*`) by default, facilitating easy integration with frontend applications hosted on different domains.
 
 ## 📄 License
 
-MIT License
+This project is licensed under the **MIT License**.
 
----
+-----
 
-Built with ❤️ using FastAPI and Fuzzy Logic
+*Built with ❤️ using FastAPI and Fuzzy Logic*
+
+```
+```
