@@ -79,13 +79,13 @@ def create_fuzzy_system():
     return stress_simulation, sleep, workload, screentime, extracurricular, stress
 fuzzy_system, sleep_var, workload_var, screentime_var, extracurricular_var, stress_var = create_fuzzy_system()
 def get_membership_degrees(value, variable):
-    """Calculate membership degrees for a given value across all fuzzy sets"""
+
     degrees = {}
     for label in variable.terms:
         degrees[label] = float(fuzz.interp_membership(variable.universe, variable[label].mf, value))
     return degrees
 def get_stress_label(stress_value):
-    """Determine stress label based on value"""
+
     if stress_value < 25:
         return "Very Low Stress"
     elif stress_value < 45:
