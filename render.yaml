@@ -4,8 +4,36 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    # Netlify serves the frontend; Render deploys this backend repository.
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --limit-concurrency 64 --timeout-keep-alive 5 --no-access-log
+    healthCheckPath: /api/health/ready
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.11
+        value: 3.12.14
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: true
+      - key: ENABLE_DEV_AUTH
+        value: false
+      - key: FRONTEND_DIST
+        value: ""
+      - key: LLM_ENABLED
+        value: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        value: https://stressdetect.netlify.app
+      - key: BACKEND_HOST
+        value: studentstressdetector-backend.onrender.com
+      - key: OIDC_CLIENT_ID
+        sync: false
+      - key: OIDC_CLIENT_SECRET
+        sync: false

@@ -1,10 +1,17 @@
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-pydantic==2.9.2
-numpy==1.26.4
-scipy==1.13.0
-networkx>=2.8
-packaging>=21.0
-setuptools>=65.0
-scikit-fuzzy @ git+https://github.com/scikit-fuzzy/scikit-fuzzy.git@master
-python-multipart==0.0.9
+# Tested on Python 3.12. Install development tools from requirements-dev.txt.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+SQLAlchemy==2.0.52
+alembic==1.20.0
+psycopg[binary]==3.3.5
+Authlib==1.8.0
+itsdangerous==2.2.0
+httpx==0.28.1
+numpy==2.5.3
+scipy==1.18.1
+scikit-fuzzy==0.5.0
+python-dotenv==1.2.3
+tzdata==2026.3

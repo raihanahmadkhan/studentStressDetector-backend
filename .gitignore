@@ -64,3 +64,7 @@ Thumbs.db
 
 # Logs
 *.log
+.venv/
+.venv312/
+.local/
+.ruff_cache/
