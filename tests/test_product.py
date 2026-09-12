@@ -227,3 +227,11 @@ def test_patterns_reads_latest_revisions_and_deletion(signed_in):
     assert body['metrics'][0]['recent_count'] == 1
     assert delete_one(client, updated).status_code == 200
     assert client.get('/api/patterns', params={'end_date': saved['observation_date']}).json()['series'][-1]['inputs'] is None
+
+def test_export_contains_account_profile(signed_in, db):
+    client, user = signed_in
+    user.display_name = 'Export Student'
+    user.google_email = 'export@example.com'
+    db.commit()
+    exported = client.get('/api/data/export').json()
+    assert exported['profile'] == {'display_name': 'Export Student', 'google_email': 'export@example.com'}

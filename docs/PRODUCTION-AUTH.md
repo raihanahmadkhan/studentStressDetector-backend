@@ -26,7 +26,7 @@ Mutation requests retain the exact Netlify Origin and the session's `X-CSRF-Toke
 5. Copy the client ID and client secret into Render's backend environment. Do not paste the secret into the frontend repository, Netlify variables or browser UI. No downloaded client JSON belongs in source control.
 6. Local Google testing can use a separate web client with callback `http://localhost:5173/api/auth/callback`. The existing optional local development account needs no Google configuration.
 
-The implementation requests only `openid`; no Gmail, Drive, Calendar, offline access or refresh-token scopes are needed. See Google's [web-server OAuth configuration](https://developers.google.com/identity/protocols/oauth2/web-server) and [OpenID Connect documentation](https://developers.google.com/identity/openid-connect/openid-connect).
+The implementation requests `openid email profile` for the account name and verified email; no Gmail, Drive, Calendar, offline access or refresh-token scopes are needed. See Google's [web-server OAuth configuration](https://developers.google.com/identity/protocols/oauth2/web-server) and [OpenID Connect documentation](https://developers.google.com/identity/openid-connect/openid-connect).
 
 ## Owner setup: existing Render service
 
@@ -82,3 +82,9 @@ Verification on 2026-09-12: full backend suite **183 passed** (three existing de
 Netlify proxy rewrites have a [26-second timeout](https://docs.netlify.com/manage/routing/redirects/rewrites-proxies/). The current Render Blueprint selects the free plan, whose [idle spin-down and roughly one-minute wake-up](https://render.com/docs/free) can exceed that timeout and the frontend's 12-second request timeout. A sleeping backend may require a later retry. This configuration does not upgrade hosting, introduce keep-alive infrastructure or promise uninterrupted availability. A production database must be durable; Render's free PostgreSQL offerings have their own expiry limits.
 
 The Netlify proxy participates in the session security boundary. Google credentials, public publishing/verification and actual deployed header behavior require owner configuration and live validation. LLM functionality is unrelated to signing in and was not changed.
+
+## Account profiles
+
+Run `alembic upgrade head` before starting this release (revision `0004_account_profile`). This adds nullable display_name and google_email columns without changing existing identities or check-ins. Existing Google users sign out and sign in again to populate verified profile claims. Configure the Google consent screen for the basic email and profile scopes; callback and secrets remain unchanged.
+
+`GET /api/me` includes display_name and google_email. `PATCH /api/account` accepts only a display_name (trimmed, 1–80 characters, no control/bidirectional override characters), protected by the existing session, Origin and CSRF checks. An edited name survives subsequent Google logins. Google email is read-only, refreshed from verified ID-token claims, and is never used to link accounts. Profile edits do not change assessment history versions. Exports include the profile; account deletion removes it with the user row and existing cascading data/session deletion. Profile details are not added to LLM fact bundles.

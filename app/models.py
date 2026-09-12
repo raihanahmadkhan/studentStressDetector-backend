@@ -21,6 +21,8 @@ class User(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     oidc_issuer: Mapped[str] = mapped_column(String(255))
     oidc_subject: Mapped[str] = mapped_column(String(255))
+    display_name: Mapped[str | None] = mapped_column(String(80))
+    google_email: Mapped[str | None] = mapped_column(String(320))
     timezone: Mapped[str] = mapped_column(String(64), default='Asia/Kolkata')
     history_version: Mapped[int] = mapped_column(default=0, server_default='0')
     llm_consent: Mapped[bool] = mapped_column(default=False, server_default=text('false'))

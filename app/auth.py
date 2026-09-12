@@ -10,10 +10,12 @@ from functools import lru_cache
 import hashlib
 import ipaddress
 import secrets
+import unicodedata
 from uuid import uuid4
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, Request, Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
@@ -31,6 +33,20 @@ SESSION_COOKIE = "wellbeing_session"
 GOOGLE_ISSUER = "https://accounts.google.com"
 GOOGLE_ISSUERS = (GOOGLE_ISSUER, "accounts.google.com")
 OIDC_LOGIN_TTL_SECONDS = 600
+
+
+class AccountProfile(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    display_name: str = Field(strict=True, min_length=1, max_length=80)
+
+    @field_validator('display_name', mode='before')
+    @classmethod
+    def clean_name(cls, value):
+        if isinstance(value, str):
+            if any(unicodedata.category(c) in ('Cc', 'Cs') or c in '\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069' for c in value):
+                raise ValueError('Display name must not contain control characters.')
+            return value.strip()
+        return value
 
 
 def _now() -> datetime:
@@ -56,7 +72,7 @@ def _oidc_client():
         client_secret=settings.oidc_client_secret,
         server_metadata_url=f"{GOOGLE_ISSUER}/.well-known/openid-configuration",
         client_kwargs={
-            "scope": "openid",
+            "scope": "openid email profile",
             "code_challenge_method": "S256",
             "timeout": 10.0,
         },
@@ -127,11 +143,14 @@ def _user_payload(user: User, session: AuthSession) -> dict:
         "history_version": user.history_version,
         "csrf_token": session.csrf_token,
         "llm_consent": user.llm_consent,
+        "display_name": user.display_name,
+        "google_email": user.google_email,
     }
 
 
 def _start_session(
-    request: Request, response: Response, db: DatabaseSession, issuer: str, subject: str
+    request: Request, response: Response, db: DatabaseSession, issuer: str, subject: str,
+    profile: dict | None = None,
 ) -> tuple[User, AuthSession]:
     # The issuer/subject uniqueness constraint resolves concurrent first logins.
     db.execute(
@@ -140,8 +159,20 @@ def _start_session(
         .on_conflict_do_nothing(index_elements=[User.oidc_issuer, User.oidc_subject])
     )
     user = db.scalar(
-        select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject)
+        select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject).with_for_update()
     )
+    if profile is not None and issuer == GOOGLE_ISSUER:
+        # Only claims from the verified ID token reach this function. Email is
+        # display information; the issuer/subject pair remains the identity.
+        email = profile.get('email')
+        user.google_email = email if (profile.get('email_verified') is True
+            and isinstance(email, str) and 1 <= len(email) <= 320
+            and '@' in email and not any(c.isspace() or unicodedata.category(c).startswith('C') for c in email)) else None
+        if user.display_name is None:
+            try:
+                user.display_name = AccountProfile(display_name=profile.get('name')).display_name
+            except ValueError:
+                pass  # Missing or unsuitable provider names never block sign-in.
     previous_token = request.cookies.get(SESSION_COOKIE)
     if previous_token and len(previous_token) <= 256:
         db.execute(delete(AuthSession).where(AuthSession.token_hash == _token_hash(previous_token)))
@@ -261,7 +292,7 @@ async def oidc_callback(request: Request, db: DatabaseSession = Depends(get_db))
         raise ApiError(400, "AUTHENTICATION_FAILED", "Sign-in could not be verified. Please try again.") from None
     request.session.clear()
     response = RedirectResponse(str(get_settings().frontend_origin).rstrip("/"), status_code=303)
-    await run_in_threadpool(_start_session, request, response, db, GOOGLE_ISSUER, subject)
+    await run_in_threadpool(_start_session, request, response, db, GOOGLE_ISSUER, subject, claims)
     return response
 
 
@@ -277,6 +308,14 @@ def dev_login(request: Request, response: Response, db: DatabaseSession = Depend
 @router.get("/api/me")
 def me(request: Request, response: Response, user: User = Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-store"
+    return _user_payload(user, request.state.session)
+
+
+@router.patch('/api/account')
+def update_account(payload: AccountProfile, request: Request,
+                   user: User = Depends(require_csrf), db: DatabaseSession = Depends(get_db)):
+    user.display_name = payload.display_name
+    db.commit()
     return _user_payload(user, request.state.session)
 
 

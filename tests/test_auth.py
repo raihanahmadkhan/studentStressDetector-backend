@@ -225,7 +225,7 @@ def oidc_provider(auth_settings, monkeypatch, oidc_key):
         client_secret=auth_settings.oidc_client_secret,
         server_metadata_url=f"{auth.GOOGLE_ISSUER}/.well-known/openid-configuration",
         client_kwargs={
-            "scope": "openid",
+            "scope": "openid email profile",
             "code_challenge_method": "S256",
             "transport": httpx.MockTransport(transport),
         },
@@ -241,7 +241,7 @@ def _begin_oidc(client, provider):
     provider["nonce"] = params["nonce"][0]
     assert params["code_challenge_method"] == ["S256"]
     assert params["code_challenge"][0]
-    assert params["scope"] == ["openid"]
+    assert params["scope"] == ["openid email profile"]
     return params
 
 
@@ -307,3 +307,40 @@ def test_oidc_failures_do_not_create_session_or_expose_provider_errors(auth_clie
     assert "private-provider-details" not in json.dumps(response.json())
     assert db.scalar(select(AuthSession)) is None
     assert "oidc_state" not in auth_client.cookies
+
+def test_google_profile_initializes_and_preserves_edited_name(auth_client, db, oidc_provider):
+    oidc_provider['override'] = {'name': '  Alex Student  ', 'email': 'alex@example.com', 'email_verified': True}
+    params = _begin_oidc(auth_client, oidc_provider)
+    assert auth_client.get('/api/auth/callback', params={'state': params['state'][0], 'code': 'profile'}, follow_redirects=False).status_code == 303
+    me = auth_client.get('/api/me').json()
+    assert me['display_name'] == 'Alex Student'
+    assert me['google_email'] == 'alex@example.com'
+    headers = {'Origin': ORIGIN, 'X-CSRF-Token': me['csrf_token']}
+    assert auth_client.patch('/api/account', json={'display_name': 'My name'}, headers={'Origin': ORIGIN}).status_code == 403
+    updated = auth_client.patch('/api/account', json={'display_name': '  Alex  '}, headers=headers)
+    assert updated.status_code == 200
+    assert updated.json()['display_name'] == 'Alex'
+    assert updated.json()['history_version'] == me['history_version']
+    assert auth_client.get('/api/me').json()['display_name'] == 'Alex'
+    assert auth_client.patch('/api/account', json={'display_name': 'Alex', 'google_email': 'forged@example.com'}, headers=headers).status_code == 422
+    params = _begin_oidc(auth_client, oidc_provider)
+    oidc_provider['override']['name'] = 'New Google Name'
+    oidc_provider['override']['email'] = 'updated@example.com'
+    assert auth_client.get('/api/auth/callback', params={'state': params['state'][0], 'code': 'again'}, follow_redirects=False).status_code == 303
+    assert auth_client.get('/api/me').json()['display_name'] == 'Alex'
+    assert auth_client.get('/api/me').json()['google_email'] == 'updated@example.com'
+
+
+@pytest.mark.parametrize('name', ['', '   ', 'x'*81, 'name\ncontrol', 123, None])
+def test_account_rejects_invalid_names(auth_client, name):
+    me = _dev_login(auth_client)
+    response = auth_client.patch('/api/account', json={'display_name': name}, headers={'Origin': ORIGIN, 'X-CSRF-Token': me['csrf_token']})
+    assert response.status_code == 422
+    assert auth_client.get('/api/me').json()['display_name'] is None
+
+
+def test_unverified_email_is_not_stored(auth_client, db, oidc_provider):
+    oidc_provider['override'] = {'email': 'unverified@example.com', 'email_verified': False}
+    params = _begin_oidc(auth_client, oidc_provider)
+    assert auth_client.get('/api/auth/callback', params={'state': params['state'][0], 'code': 'profile'}, follow_redirects=False).status_code == 303
+    assert auth_client.get('/api/me').json()['google_email'] is None

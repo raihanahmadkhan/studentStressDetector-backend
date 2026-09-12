@@ -79,7 +79,7 @@ def create_app() -> FastAPI:
     @app.get('/api/health/ready', tags=['health'])
     def ready(db: Session = Depends(get_db)):
         revision = db.execute(text('SELECT version_num FROM alembic_version')).scalar_one_or_none()
-        if revision != '0003_checkin_inputs':
+        if revision != '0004_account_profile':
             raise ApiError(503, 'migration_required', 'Database migrations are not current.')
         return {'status': 'ready', 'database': 'available', 'schema_revision': revision, 'fuzzy_version': fuzzy.MODEL_VERSION,
                 'predictions_enabled': False, 'explanations_enabled': settings.llm_enabled}

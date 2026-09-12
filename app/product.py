@@ -148,7 +148,7 @@ def export_data(user: User = Depends(get_current_user), db: Session = Depends(ge
     # Stream a consistent snapshot while holding this user's shared lock. Other
     # users remain independent, and memory does not grow with the export size.
     def chunks():
-        yield json.dumps({'format_version': 2, 'timezone': user.timezone, 'history_version': user.history_version, 'llm_consent': user.llm_consent})[:-1] + ',"revisions":['
+        yield json.dumps({'format_version': 2, 'profile': {'display_name': user.display_name, 'google_email': user.google_email}, 'timezone': user.timezone, 'history_version': user.history_version, 'llm_consent': user.llm_consent})[:-1] + ',"revisions":['
         query = select(CheckIn, CheckInRevision).join(CheckInRevision, CheckInRevision.checkin_id == CheckIn.id).where(CheckIn.user_id == user.id).order_by(CheckIn.observation_date, CheckInRevision.revision).execution_options(yield_per=20)
         first = True
         versions = set()
