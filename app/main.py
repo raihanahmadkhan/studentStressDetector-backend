@@ -12,7 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.staticfiles import StaticFiles
 
-from app import auth, checkins, fuzzy, product, reflections
+from app import auth, checkins, fuzzy, product
 from app.security import BodyLimitMiddleware, configure_request_logging
 from app.config import get_settings
 from app.database import get_db
@@ -28,7 +28,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title='Student Workload & Wellbeing API', version='4.0.0',
         docs_url=None if production else '/docs', redoc_url=None if production else '/redoc',
         openapi_url=None if production else '/openapi.json',
-        description='Grounded reflections over versioned heuristic and personal analytics. Predictive serving remains evidence-gated and disabled.')
+        description='Versioned fuzzy stress estimates and personal routine analytics.')
     install_error_handlers(app)
     hosts = [urlsplit(settings.frontend_origin).hostname]
     if settings.backend_host:
@@ -66,7 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(checkins.router)
     app.include_router(product.router)
-    app.include_router(reflections.router)
+
 
     @app.get('/api/fuzzy-model', tags=['model'])
     def model_specification():
@@ -82,13 +82,7 @@ def create_app() -> FastAPI:
         if revision != '0004_account_profile':
             raise ApiError(503, 'migration_required', 'Database migrations are not current.')
         return {'status': 'ready', 'database': 'available', 'schema_revision': revision, 'fuzzy_version': fuzzy.MODEL_VERSION,
-                'predictions_enabled': False, 'explanations_enabled': settings.llm_enabled}
-
-    @app.get('/api/ml/status')
-    def ml_status(user=Depends(auth.get_current_user)):
-        return {'serving_enabled': False, 'target': 'next-day self-reported strain',
-                'reason': 'No model is approved for serving. Personal evaluation must beat both baselines and pass review.',
-                'minimum_pairs': 120, 'minimum_calendar_span': 150}
+                'predictions_enabled': False, 'explanations_enabled': False}
 
     if settings.frontend_dist:
         dist = Path(settings.frontend_dist).resolve()

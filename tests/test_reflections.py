@@ -18,6 +18,12 @@ from app.reflection_facts import render
 from test_checkins import save, signed_in, identity
 
 
+@pytest.fixture(autouse=True)
+def historical_reflection_engine(client):
+    """Retired engine regression coverage; production does not mount these routes."""
+    client.app.include_router(reflections.router)
+
+
 @pytest.fixture
 def provider(monkeypatch):
     settings = Settings(_env_file=None, app_env='test', llm_enabled=True, openai_api_key='test-not-a-real-key', llm_model='test-model')

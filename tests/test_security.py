@@ -49,8 +49,8 @@ def test_logs_only_allowlisted_metadata():
 def test_ai_and_ml_are_authenticated_and_csrf_protected(client, signed_in):
     client, _ = signed_in
     client.headers.pop('X-CSRF-Token')
-    assert client.patch('/api/ai/consent', json={'enabled': True}).status_code == 403
-    assert client.get('/api/ml/status').json()['serving_enabled'] is False
+    assert client.patch('/api/ai/consent', json={'enabled': True}).status_code == 404
+    assert client.get('/api/ml/status').status_code == 404
     client.cookies.clear()
-    assert client.get('/api/ai/status').status_code == 401
-    assert client.get('/api/ml/status').status_code == 401
+    assert client.get('/api/ai/status').status_code == 404
+    assert client.get('/api/ml/status').status_code == 404
