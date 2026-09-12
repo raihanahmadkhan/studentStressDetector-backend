@@ -12,6 +12,7 @@ itsdangerous==2.2.0
 httpx==0.28.1
 numpy==2.5.3
 scipy==1.18.1
+packaging==26.3
 scikit-fuzzy==0.5.0
 python-dotenv==1.2.3
 tzdata==2026.3
