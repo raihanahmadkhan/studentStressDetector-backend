@@ -2,12 +2,12 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env', extra='ignore')
+    model_config = SettingsConfigDict(env_file='.env', extra='ignore', hide_input_in_errors=True)
 
     app_env: Literal['development', 'test', 'production'] = 'development'
     database_url: str = 'postgresql+psycopg://wellbeing:wellbeing@127.0.0.1:55432/wellbeing'
@@ -19,12 +19,6 @@ class Settings(BaseSettings):
     enable_dev_auth: bool = False
     session_ttl_hours: int = 168
     cookie_secure: bool = False
-    llm_enabled: bool = False
-    openai_api_key: SecretStr = SecretStr('')
-    llm_model: str = Field('', max_length=100, pattern=r'^[a-zA-Z0-9._:-]*$')
-    llm_timeout_seconds: float = Field(8, ge=1, le=15)
-    llm_hourly_limit: int = Field(5, ge=1, le=20)
-    llm_daily_limit: int = Field(20, ge=1, le=100)
     frontend_dist: str = ''
 
     @field_validator('database_url')
@@ -65,8 +59,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def production_safety(self):
-        if self.llm_enabled and (not self.openai_api_key.get_secret_value() or not self.llm_model):
-            raise ValueError('Enabling LLM requires OPENAI_API_KEY and an explicit LLM_MODEL')
         if bool(self.oidc_client_id) != bool(self.oidc_client_secret):
             raise ValueError('Configure both OIDC client credentials or neither')
         if self.app_env == 'production':

@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     # Netlify serves the frontend; Render deploys this backend repository.
-    buildCommand: pip install -r requirements.txt
+    buildCommand: python -m pip install --upgrade pip==26.2.1 && pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --limit-concurrency 64 --timeout-keep-alive 5 --no-access-log
     healthCheckPath: /api/health/ready
     envVars:
@@ -19,12 +19,6 @@ services:
         value: false
       - key: FRONTEND_DIST
         value: ""
-      - key: LLM_ENABLED
-        value: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: LLM_MODEL
-        sync: false
       - key: SESSION_SECRET
         generateValue: true
       - key: DATABASE_URL

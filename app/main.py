@@ -13,7 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.staticfiles import StaticFiles
 
 from app import auth, checkins, fuzzy, product
-from app.security import BodyLimitMiddleware, configure_request_logging
+from app.security import BodyLimitMiddleware, AbuseLimitMiddleware, configure_request_logging
 from app.config import get_settings
 from app.database import get_db
 from app.errors import ApiError, install_error_handlers
@@ -37,6 +37,8 @@ def create_app() -> FastAPI:
         hosts += ['localhost', '127.0.0.1', 'testserver']
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
     app.add_middleware(BodyLimitMiddleware)
+    if production:
+        app.add_middleware(AbuseLimitMiddleware)
     app.add_middleware(SessionMiddleware, secret_key=settings.session_secret, session_cookie='oidc_state',
         max_age=600, same_site='lax', https_only=settings.cookie_secure)
     app.add_middleware(CORSMiddleware, allow_origins=[settings.frontend_origin], allow_credentials=True,

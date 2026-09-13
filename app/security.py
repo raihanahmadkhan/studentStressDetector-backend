@@ -2,8 +2,49 @@
 import asyncio
 import json
 import logging
+import time
+from collections import OrderedDict
+from hashlib import sha256
 from datetime import datetime, timezone
 from starlette.responses import JSONResponse
+
+
+class AbuseLimitMiddleware:
+    """Bounded, per-process fixed windows for the single-worker deployment.
+
+    Never trust forwarded IP headers: proxy peers share the anonymous budget.
+    A separate global ceiling prevents forged session tokens bypassing limits.
+    """
+    def __init__(self, app, clock=time.monotonic):
+        self.app, self.clock = app, clock
+        self.buckets = OrderedDict()
+
+    def allow(self, key, limit):
+        now = self.clock()
+        start, count = self.buckets.get(key, (now, 0))
+        if now - start >= 60:
+            start, count = now, 0
+        self.buckets[key] = (start, count + 1)
+        self.buckets.move_to_end(key)
+        while len(self.buckets) > 4096:
+            self.buckets.popitem(last=False)
+        return count < limit
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get('path', '')
+        if scope['type'] != 'http' or not path.startswith('/api/') or path.startswith('/api/health/'):
+            return await self.app(scope, receive, send)
+        headers = dict(scope.get('headers', []))
+        # Hash the opaque cookie header; never retain raw credentials or log keys.
+        identity = sha256(headers.get(b'cookie', b'anonymous')).hexdigest()
+        auth = path in ('/api/auth/login', '/api/auth/callback', '/api/auth/dev-login')
+        group = 'auth' if auth else 'export' if path == '/api/data/export' else 'api'
+        allowed = self.allow(('global', group), 120 if auth else 600)
+        allowed = self.allow((identity, group), 60 if auth else 6 if group == 'export' else 120) and allowed
+        if not allowed:
+            return await JSONResponse({'error': {'code': 'rate_limited', 'message': 'Too many requests. Please wait a minute and try again.'}}, status_code=429,
+                headers={'Retry-After': '60', 'Cache-Control': 'no-store'})(scope, receive, send)
+        return await self.app(scope, receive, send)
 
 
 class BodyLimitMiddleware:

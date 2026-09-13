@@ -1,53 +1,44 @@
-# Student Wellbeing — Backend API
+# Student Stress Detector API
 
-FastAPI backend for a daily student check-in app that turns self-reported routine data into a transparent, explainable wellbeing index.
+The backend for [Student Stress Detector](https://stressdetect.netlify.app/), a student project for understanding routine-based stress and tracking self-reported strain.
 
-**Live Demo:** https://stressdetect.netlify.app/
+[Frontend repository](https://github.com/raihanahmadkhan/studentStressDetector)
 
-## Overview
+## Product
 
-Students log a short daily check-in — sleep, academic workload, deadline pressure, screen time, extracurricular load, and recovery time. The backend scores each check-in with a rule-based fuzzy inference model and returns a routine index the student can inspect, not a black-box number. The model is an authored heuristic for reflection, not a clinical or diagnostic tool.
+Google accounts, explicit daily check-ins, explainable estimates, practical guidance, revisions, descriptive trends, isolated what-if scenarios, exports, and account deletion.
 
-The [frontend](https://github.com/raihanahmadkhan/studentStressDetector) is a separate React/TypeScript app that consumes this API.
+Saving again for a date updates its current values while retaining earlier revisions. Retries do not duplicate revisions or revert newer saves. Guidance is deterministic and grounded in recorded rule activations.
 
-## Features
+## Calculation
 
-- Google sign-in with secure, server-side sessions
-- Daily check-ins with a full edit history, so past entries are never silently overwritten
-- Personal trends and pattern detection over time
-- "What-if" scenario exploration against the current model, without affecting saved history
-- Self-service data export and account deletion
-- A transparent, versioned fuzzy-logic scoring model with published rules — no hidden weights
-- Optional, opt-in AI-assisted reflections on a student's own check-in history
+Six routine inputs form academic pressure, recovery deficit, and contextual pressure. Each component uses nine authored fuzzy rules, product inference, summed output sets, and centroid calculation. Their weighted scores form the final estimate. Reported strain stays independent.
+
+The current engine is a product-sum fuzzy system, not a trained classifier. It is an authored heuristic, not a clinical diagnosis or validated stress prediction. There is no active LLM or predictive ML feature.
 
 ## Architecture
 
-A single FastAPI service backed by PostgreSQL, with the frontend and backend deployed and versioned independently. Schema changes are managed through Alembic migrations. The scoring model is implemented as a standalone, versioned module so past assessments stay reproducible even as the model evolves.
+One FastAPI service with PostgreSQL, SQLAlchemy, Alembic, Pydantic, and Google authentication through Authlib. Frontend and backend deploy separately. Credentials are supplied through the backend host's environment.
 
-## Tech Stack
+## Development
 
-- **API:** FastAPI, Pydantic
-- **Database:** PostgreSQL, SQLAlchemy, Alembic
-- **Inference:** NumPy, SciPy, scikit-fuzzy
-- **Auth:** Google sign-in (Authlib)
-- **AI (optional):** OpenAI, used only for opt-in reflection summaries
+Python 3.12 and PostgreSQL are required. Create a virtual environment, install requirements-dev.txt, and copy .env.example to a private .env. Configure a dedicated local database and a separate disposable database ending in _test. Never point tests at application data.
 
-## Local Development
-
-Requires Python 3.12 and a local PostgreSQL instance.
-
-```bash
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt
-cp .env.example .env   # fill in your local database and session settings
+```sh
+python -m pip install -r requirements-dev.txt
 alembic upgrade head
-uvicorn main:app --reload
+uvicorn main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-Run the [frontend](https://github.com/raihanahmadkhan/studentStressDetector) separately and point it at this API.
+Windows helpers in scripts/ start an isolated local database and API. Development sign-in is opt-in and unavailable in production.
 
-## Limitations
+```sh
+python -m pytest
+python scripts/verify-migrations.py
+python scripts/verify-backup.py
+python -m pip check
+```
 
-- The scoring model is a hand-authored heuristic, not a clinically validated predictor of stress
-- AI-assisted reflections require a personally configured API key and are disabled by default
-- Built as a personal/portfolio project; not intended for production-scale traffic
+Migration and restore rehearsals modify only the configured disposable test database. Retired schema fields remain for compatibility and historical exports; they do not enable retired features.
+
+See [calculation design](docs/FUZZY-3.md), [guidance](docs/GUIDANCE.md), and [verification](docs/VERIFICATION.md).

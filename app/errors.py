@@ -16,7 +16,10 @@ def error_response(request: Request, status: int, code: str, message: str, field
     body = {'code': code, 'message': message, 'request_id': getattr(request.state, 'request_id', str(uuid4()))}
     if fields is not None:
         body['fields'] = fields
-    return JSONResponse(status_code=status, content={'error': body})
+    return JSONResponse(status_code=status, content={'error': body}, headers={
+        'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY',
+    })
 
 
 def install_error_handlers(app: FastAPI):

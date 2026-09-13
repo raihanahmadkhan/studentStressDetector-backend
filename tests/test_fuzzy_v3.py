@@ -9,7 +9,6 @@ from sqlalchemy import select
 from app import fuzzy, fuzzy_v2
 from app.models import CheckInRevision, EngineVersion
 from app.schemas import RoutineInputs
-from app.ml import dataset
 from test_checkins import signed_in, save, payload
 
 BASE = dict(sleep_hours=6, academic_load=5, deadline_pressure=5, screen_hours=8, extracurricular_load=5, recovery=5, reported_strain=5)
@@ -113,12 +112,6 @@ def test_legacy_revision_export_and_scenario_are_not_reinterpreted(signed_in,db)
     assert 'deadline_pressure' in exported.text and 'recovery' in exported.text
 
 
-def test_missing_legacy_features_are_not_imputed_for_ml():
-    from test_ml import row
-    from datetime import date,timedelta
-    day=date(2026,1,1)
-    assert dataset([row(day,deadline_pressure=None),row(day+timedelta(days=1))])==[]
-
 @pytest.mark.parametrize('name', list(fuzzy._RANGES))
 def test_direction_consistency_across_component_input_space(name):
     import numpy as np
@@ -147,20 +140,6 @@ def test_product_rule_activation_scaled_sum_and_centroid():
     # Outputs medium/high/medium/high: identical-area symmetric sets at 50/85.
     assert component['raw_centroid']==pytest.approx(67.5)
     assert component['contribution']==pytest.approx(.45*67.5)
-
-
-def test_reflection_bundle_uses_saved_component_facts(signed_in,db):
-    from app.reflections import ReflectionRequest
-    from app.reflection_facts import bundle
-    client,user=signed_in
-    saved=save(client).json()
-    facts=bundle(db,user,ReflectionRequest(kind='checkin',checkin_id=saved['id'],expected_history_version=1))
-    components={f['source']['component_id']: f for f in facts['facts'] if 'component_id' in f['source']}
-    assert set(components)=={'academic_pressure','recovery_deficit','contextual_pressure'}
-    for c in saved['assessment']['components']:
-        assert components[c['id']]['text']==c['explanation']
-        assert components[c['id']]['source']['model_version']=='fuzzy-3.1.0'
-    assert len({f['id'] for f in facts['facts']})==len(facts['facts'])
 
 
 def test_analytics_new_fields_count_missing_legacy_as_missing():
