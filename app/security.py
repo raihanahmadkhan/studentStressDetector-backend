@@ -47,7 +47,20 @@ class RequestJSONFormatter(logging.Formatter):
         return json.dumps(data, separators=(',', ':'))
 
 
+class RedactAccessQuery(logging.Filter):
+    """Uvicorn access logs must never retain OAuth codes or state parameters."""
+    def filter(self, record):
+        if isinstance(record.args, tuple) and len(record.args) == 5:
+            args = list(record.args)
+            args[2] = str(args[2]).split('?', 1)[0]
+            record.args = tuple(args)
+        return True
+
+
 def configure_request_logging():
+    access = logging.getLogger('uvicorn.access')
+    if not any(isinstance(f, RedactAccessQuery) for f in access.filters):
+        access.addFilter(RedactAccessQuery())
     logger = logging.getLogger('wellbeing.requests')
     if not logger.handlers:
         handler = logging.StreamHandler()

@@ -58,7 +58,7 @@ def bundle(db, user, payload):
             if metric['difference'] is None:
                 add(f'{name}: {counts}; not enough data for a comparison (needs at least 4 and 10 reports respectively). Missing days are not zero.', 'missing', context)
             else:
-                unit = 'hours' if metric['metric'].endswith('hours') else 'points on a 0–10 scale'
+                unit = 'hours' if metric['metric'].endswith('hours') else 'points on a 0-10 scale'
                 add(f'{name}: {counts}; recent median {metric["recent_median"]:g}, baseline median {metric["baseline_median"]:g}, difference {metric["difference"]:+g} {unit}. This describes recorded days only.', 'pattern', context)
             if metric['persistent_deviation']:
                 add(f'{name} was {metric["persistent_deviation"]} than its baseline median by at least the deviation threshold on three consecutive calendar days ending {result["windows"]["recent"][1]}.', 'pattern', context)

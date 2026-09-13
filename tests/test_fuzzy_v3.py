@@ -34,7 +34,7 @@ def test_cartesian_corners_have_complete_component_coverage():
             assert len(component['rules'])==9
             assert sum(r['firing_strength']>0 for r in component['rules'])==1
             assert any(component['aggregate']['membership'])
-        assert result['raw_score']==sum(c['contribution'] for c in result['components'])
+        assert result['raw_score']==pytest.approx(sum(c['contribution'] for c in result['components']))
         assert result['raw_centroid'] is None
 
 
@@ -105,11 +105,11 @@ def test_legacy_revision_export_and_scenario_are_not_reinterpreted(signed_in,db)
     edit=client.patch('/api/check-ins/'+saved['id'],json={**BASE,'expected_revision':1},headers={'Idempotency-Key':str(uuid4())})
     assert edit.status_code==200,edit.text
     assert edit.json()['questionnaire_version']=='check-in-2.0.0'
-    assert edit.json()['assessment']['model_version']=='fuzzy-3.0.0'
+    assert edit.json()['assessment']['model_version']=='fuzzy-3.1.0'
     db.expire_all()
     assert db.scalar(select(CheckInRevision).where(CheckInRevision.revision==1)).assessment==legacy
     exported=client.get('/api/data/export')
-    assert exported.status_code==200 and 'fuzzy-2.0.0' in exported.text and 'fuzzy-3.0.0' in exported.text
+    assert exported.status_code==200 and 'fuzzy-2.0.0' in exported.text and 'fuzzy-3.1.0' in exported.text
     assert 'deadline_pressure' in exported.text and 'recovery' in exported.text
 
 
@@ -159,7 +159,7 @@ def test_reflection_bundle_uses_saved_component_facts(signed_in,db):
     assert set(components)=={'academic_pressure','recovery_deficit','contextual_pressure'}
     for c in saved['assessment']['components']:
         assert components[c['id']]['text']==c['explanation']
-        assert components[c['id']]['source']['model_version']=='fuzzy-3.0.0'
+        assert components[c['id']]['source']['model_version']=='fuzzy-3.1.0'
     assert len({f['id'] for f in facts['facts']})==len(facts['facts'])
 
 

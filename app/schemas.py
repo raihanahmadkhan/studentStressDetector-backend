@@ -109,6 +109,16 @@ class Assessment(Contract):
     limitations: list[str]
 
 
+class Guidance(Contract):
+    id: str
+    policy_version: str
+    component_id: str
+    rule_ids: list[str]
+    title: str
+    action: str
+    reason: str
+
+
 class CheckInResponse(Contract):
     id: UUID
     observation_date: date
@@ -120,6 +130,7 @@ class CheckInResponse(Contract):
     inputs: HistoricalInputs
     assessment: Assessment
     history_version: int
+    guidance: list[Guidance] = Field(default_factory=list, max_length=3)
 
 
 class CheckInPage(Contract):

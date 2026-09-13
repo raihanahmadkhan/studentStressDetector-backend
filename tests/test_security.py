@@ -54,3 +54,13 @@ def test_ai_and_ml_are_authenticated_and_csrf_protected(client, signed_in):
     client.cookies.clear()
     assert client.get('/api/ai/status').status_code == 404
     assert client.get('/api/ml/status').status_code == 404
+
+def test_uvicorn_access_logs_strip_query_secrets():
+    import logging
+    from app.security import RedactAccessQuery
+    record = logging.LogRecord('uvicorn.access', logging.INFO, '', 0, '%s - "%s %s HTTP/%s" %d',
+        ('127.0.0.1', 'GET', '/api/auth/callback?code=test-secret&state=test-state', '1.1', 303), None)
+    assert RedactAccessQuery().filter(record)
+    assert 'test-secret' not in record.getMessage()
+    assert 'test-state' not in record.getMessage()
+    assert '/api/auth/callback' in record.getMessage()

@@ -251,7 +251,7 @@ def test_oidc_validates_real_signed_token_and_stores_only_application_session(au
         "/api/auth/callback", params={"state": params["state"][0], "code": "one-time-code"}, follow_redirects=False
     )
     assert response.status_code == 303, response.text
-    assert response.headers["location"] == ORIGIN
+    assert response.headers["location"] == ORIGIN + '/?signed_in=1'
     user = db.scalar(select(User))
     assert user.oidc_issuer == auth.GOOGLE_ISSUER
     assert user.oidc_subject == "google-student-123"
@@ -344,3 +344,33 @@ def test_unverified_email_is_not_stored(auth_client, db, oidc_provider):
     params = _begin_oidc(auth_client, oidc_provider)
     assert auth_client.get('/api/auth/callback', params={'state': params['state'][0], 'code': 'profile'}, follow_redirects=False).status_code == 303
     assert auth_client.get('/api/me').json()['google_email'] is None
+
+@pytest.mark.parametrize('extra', [[('code','duplicate')], [('state','duplicate')], [('iss','https://attacker.invalid')], [('iss',auth.GOOGLE_ISSUER),('iss',auth.GOOGLE_ISSUER)]])
+def test_callback_rejects_ambiguous_or_foreign_provider_parameters(auth_client, oidc_provider, extra):
+    params = _begin_oidc(auth_client, oidc_provider)
+    response = auth_client.get('/api/auth/callback', params=[('state',params['state'][0]),('code','test-only'),*extra], follow_redirects=False)
+    assert response.status_code == 400
+    assert not any(r.url.path == '/token' for r in oidc_provider['requests'])
+
+@pytest.mark.parametrize('provider_error,marker', [('access_denied', 'cancelled'), ('server_error', 'failed')])
+def test_provider_decline_returns_to_app_without_session(auth_client, db, oidc_provider, provider_error, marker):
+    params = _begin_oidc(auth_client, oidc_provider)
+    response = auth_client.get('/api/auth/callback', params={'state': params['state'][0], 'error': provider_error, 'error_description': 'private-provider-detail'}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers['location'] == ORIGIN + '/?sign_in=' + marker
+    assert response.headers['cache-control'] == 'no-store'
+    assert 'private-provider-detail' not in response.text + response.headers['location']
+    assert db.scalar(select(AuthSession)) is None
+    assert not auth_client.cookies.get('oidc_state')
+    assert auth_client.get('/api/me').status_code == 401
+
+@pytest.mark.parametrize('extra', ['&state=duplicate', '&code=unexpected', '&error=duplicate', '&iss=https://foreign.example'])
+def test_provider_error_does_not_bypass_callback_validation(auth_client, oidc_provider, extra):
+    params = _begin_oidc(auth_client, oidc_provider)
+    response = auth_client.get('/api/auth/callback?error=access_denied&state=' + params['state'][0] + extra, follow_redirects=False)
+    assert response.status_code == 400
+
+
+def test_unsolicited_cancellation_is_rejected(auth_client, oidc_provider):
+    response = auth_client.get('/api/auth/callback?error=access_denied&state=forged', follow_redirects=False)
+    assert response.status_code == 400

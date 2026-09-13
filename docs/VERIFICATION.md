@@ -21,7 +21,7 @@ The LLM/provider architecture is unchanged. No new live-provider quality or pred
 
 ---
 
-## Historical Phase 3–4 verification
+## Historical Phase 3-4 verification
 
 # Verification record â€” 2026-09-12
 

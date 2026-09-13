@@ -58,7 +58,7 @@ def test_google_session_csrf_and_logout_across_proxy(db, auth_settings, oidc_pro
         assert {k.lower(): v for k, v in state_cookie._rest.items()}.get('samesite') == 'lax'
         response = browser.get('/api/auth/callback', params={'state': params['state'][0], 'code': 'test-code'}, follow_redirects=False)
         assert response.status_code == 303, response.text
-        assert response.headers['location'] == PUBLIC
+        assert response.headers['location'] == PUBLIC + '/?signed_in=1'
         assert response.headers['cache-control'] == 'no-store'
         cookie = next(v for v in response.headers.get_list('set-cookie') if v.startswith('wellbeing_session='))
         assert all(v in cookie for v in ('Secure', 'HttpOnly', 'SameSite=lax', 'Path=/'))

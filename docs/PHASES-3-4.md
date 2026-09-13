@@ -10,7 +10,7 @@ At the Phase 3 review, no parameters were added. The subsequent explicit check-i
 | --- | --- | --- |
 | Deadline pressure | Could distinguish a near deadline from total workload | Defer: no real observations, validated questionnaire wording or defensible membership/rule policy demonstrate incremental value over academic workload. Arbitrary new rules would double-count demand. |
 | Focus/energy | Could provide subjective context | Defer: focus and energy are different constructs; one combined rating is ambiguous and may overlap the independent strain target. No evidence supports their fuzzy treatment or predictive benefit. |
-| Social/personal commitment load | Captures nonacademic demand | Already covered by Other commitments (nonacademic demand 0–10). Adding a duplicate parameter would increase burden and double-count it. |
+| Social/personal commitment load | Captures nonacademic demand | Already covered by Other commitments (nonacademic demand 0-10). Adding a duplicate parameter would increase burden and double-count it. |
 
 Future adoption requires a separately defined, optional nullable field; stable wording/range; missingness analysis; a questionnaire version and immutable revision migration; a separately justified fuzzy version with no imputation or clipping; its own analytic counts/units; and as-of ML features tested for incremental benefit. Lack of data is not evidence of benefit.
 
@@ -49,13 +49,13 @@ Fallbacks cover no provider, no consent, quota/in-flight limit, uncertain replay
 
 ## Predictive ML evaluation path
 
-Target: next calendar day's **independently self-reported strain**, 0–10. The heuristic index is never a label or feature. No synthetic observations are added to application history.
+Target: next calendar day's **independently self-reported strain**, 0-10. The heuristic index is never a label or feature. No synthetic observations are added to application history.
 
 The pipeline is local/read-only and personal: it refuses pooled user data. `scripts/evaluate-ml.py --user-id <UUID> --output <local-json>` loads at most two years/10,000 revisions for that one account. Omit the user argument only if the installation has at most one account. It produces an aggregate report, no serving artifact or prediction endpoint.
 
 Feature cutoff is the end of observation day in the timezone saved with the observation. Use the latest revision actually received before that cutoff. Exclude retrospective reports and later corrections. Target is the first nonmissing next-day report received on that day, after the feature cutoff; missing calendar days do not form a pair. A timezone shift cannot turn an already known target into future evidence. Current strain must be reported, allowing an honest persistence baseline. This complete-case restriction introduces selection bias, explicitly limiting generalization.
 
-Features are sleep, academic load, screen hours, other commitments, deadline pressure, recovery and current reported strain (feature policy next-day-strain-2.0.0). All must be recorded; legacy missing values are excluded, never imputed. Source questionnaire/engine provenance accompanies prepared pairs and is not a predictive feature. Candidate: train-fold-standardized ridge regression, fixed alpha=10, unpenalized intercept, outputs bounded to 0–10. Existing NumPy supplies the small linear solve. Baselines: last reported strain and training-set median. No hyperparameter search or shared/global model is fitted.
+Features are sleep, academic load, screen hours, other commitments, deadline pressure, recovery and current reported strain (feature policy next-day-strain-2.0.0). All must be recorded; legacy missing values are excluded, never imputed. Source questionnaire/engine provenance accompanies prepared pairs and is not a predictive feature. Candidate: train-fold-standardized ridge regression, fixed alpha=10, unpenalized intercept, outputs bounded to 0-10. Existing NumPy supplies the small linear solve. Baselines: last reported strain and training-set median. No hyperparameter search or shared/global model is fitted.
 
 Minimum evidence: 120 eligible pairs over 150 calendar days. These are conservative engineering gates, **not scientifically validated sample-size guarantees**. Evaluation uses three expanding-window folds with the last 14 eligible pairs held out in each, a calendar-day embargo, and checks that all training labels were available before the block. Each training fold needs at least 60 pairs. Scaling uses training data only. Report MAE and RMSE for every model/fold, pooled MAE, and a seeded moving-block bootstrap interval (seven consecutive eligible pairs, not necessarily seven consecutive calendar days) for improvement over the strongest baseline.
 

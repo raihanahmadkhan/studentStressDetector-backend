@@ -12,6 +12,7 @@ from starlette.responses import StreamingResponse
 import json
 
 from app import fuzzy
+from app.config import get_settings
 from app.analytics import summarize
 from app.auth import get_current_user, require_csrf, SESSION_COOKIE
 from app.checkins import lock_user, find_revision, as_response, payload_hash
@@ -205,5 +206,5 @@ def clear_account(payload: DeleteData, request: Request, response: Response,
         raise ApiError(409, 'history_changed', 'History changed. Refresh before deleting your account.')
     db.execute(delete(User).where(User.id == user.id))
     db.commit()
-    response.delete_cookie(SESSION_COOKIE, path='/')
+    response.delete_cookie(SESSION_COOKIE, path='/', secure=get_settings().cookie_secure, httponly=True, samesite='lax')
     request.session.clear()

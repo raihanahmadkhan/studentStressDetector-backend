@@ -87,7 +87,7 @@ The Netlify proxy participates in the session security boundary. Google credenti
 
 Run `alembic upgrade head` before starting this release (revision `0004_account_profile`). This adds nullable display_name and google_email columns without changing existing identities or check-ins. Existing Google users sign out and sign in again to populate verified profile claims. Configure the Google consent screen for the basic email and profile scopes; callback and secrets remain unchanged.
 
-`GET /api/me` includes display_name and google_email. `PATCH /api/account` accepts only a display_name (trimmed, 1–80 characters, no control/bidirectional override characters), protected by the existing session, Origin and CSRF checks. An edited name survives subsequent Google logins. Google email is read-only, refreshed from verified ID-token claims, and is never used to link accounts. Profile edits do not change assessment history versions. Exports include the profile; account deletion removes it with the user row and existing cascading data/session deletion. Profile details are not added to LLM fact bundles.
+`GET /api/me` includes display_name and google_email. `PATCH /api/account` accepts only a display_name (trimmed, 1-80 characters, no control/bidirectional override characters), protected by the existing session, Origin and CSRF checks. An edited name survives subsequent Google logins. Google email is read-only, refreshed from verified ID-token claims, and is never used to link accounts. Profile edits do not change assessment history versions. Exports include the profile; account deletion removes it with the user row and existing cascading data/session deletion. Profile details are not added to LLM fact bundles.
 
 ## Product simplification (2026-09-13)
 

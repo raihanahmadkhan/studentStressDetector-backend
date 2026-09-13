@@ -15,6 +15,7 @@ from app.auth import get_current_user, require_csrf
 from app.database import get_db
 from app.errors import ApiError
 from app import fuzzy
+from app.guidance import recommend
 from app.models import CheckIn, CheckInRevision, EngineVersion, Explanation, MutationReceipt, User, utcnow
 from app.schemas import Assessment, CheckInCreate, CheckInEdit, CheckInPage, CheckInResponse, RoutineInputs, HistoricalInputs
 
@@ -45,6 +46,7 @@ def as_response(checkin: CheckIn, revision: CheckInRevision, history_version: in
                              screen_hours=float(revision.screen_hours), extracurricular_load=revision.extracurricular_load,
                              reported_strain=revision.reported_strain, deadline_pressure=revision.deadline_pressure, recovery=revision.recovery),
         assessment=Assessment.model_validate(revision.assessment), history_version=history_version,
+        guidance=recommend({name: getattr(revision, name) for name in ('sleep_hours', 'academic_load', 'deadline_pressure', 'screen_hours', 'extracurricular_load', 'recovery')}, revision.assessment),
     )
 
 
@@ -115,13 +117,18 @@ def create_checkin(payload: CheckInCreate, response: Response,
         return original
     if payload.observation_date > utcnow().astimezone(ZoneInfo(payload.timezone)).date():
         raise ApiError(422, 'future_observation', 'A check-in cannot describe a future calendar day.')
-    existing = db.scalar(select(CheckIn.id).where(CheckIn.user_id == user.id, CheckIn.observation_date == payload.observation_date))
-    if existing:
-        raise ApiError(409, 'daily_checkin_exists', 'A check-in already exists for this date. Open it before editing.', {'checkin_id': str(existing)})
-    checkin = CheckIn(id=uuid4(), user_id=user.id, observation_date=payload.observation_date,
-        timezone=payload.timezone, current_revision=1)
-    db.add(checkin)
-    db.flush()
+    checkin = db.scalar(select(CheckIn).where(CheckIn.user_id == user.id, CheckIn.observation_date == payload.observation_date))
+    if checkin is not None:
+        # The user lock serializes daily saves: the last committed submission
+        # becomes current, while retries above retain their original snapshot.
+        # Keep the original calendar timezone for all revisions of this day.
+        checkin.current_revision += 1
+        response.status_code = 200
+    else:
+        checkin = CheckIn(id=uuid4(), user_id=user.id, observation_date=payload.observation_date,
+            timezone=payload.timezone, current_revision=1)
+        db.add(checkin)
+        db.flush()
     inputs = payload.model_dump(exclude={'observation_date', 'timezone'})
     return persist_revision(db, user, checkin, inputs, idempotency_key, 'create', digest)
 

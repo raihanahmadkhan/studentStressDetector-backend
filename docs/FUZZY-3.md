@@ -1,4 +1,6 @@
-# Current check-in and fuzzy model — fuzzy-3.0.0
+# Historical check-in and fuzzy model — fuzzy-3.0.0
+
+Current engine: [fuzzy-3.1.0 review](ENGINE-REVIEW.md). The later product simplification removed AI features and replaced unanswered sliders/skip controls with displayed defaults. Descriptions below record the original 3.0.0 release.
 
 This version is an authored, deterministic **routine-based index**, not a clinically validated stress detector. Neither these parameters nor their weights are scientifically validated predictors. Self-reported strain is a separate observed outcome; changing it cannot affect inference.
 
@@ -8,13 +10,13 @@ This version is an authored, deterministic **routine-based index**, not a clinic
 
 | API field | UI meaning | Range |
 | --- | --- | --- |
-| sleep_hours | Sleep ending on the observation date | 0–12 hours, steps of 0.25 |
-| academic_load | Total academic demand | Integer 0–10 |
-| deadline_pressure | Urgency/difficulty of meeting deadlines | Integer 0–10 |
-| screen_hours | Total screen use, overlapping use counted once | 0–16 hours, steps of 0.25 |
-| extracurricular_load | Other, nonacademic commitments | Integer 0–10 |
-| recovery | Opportunity for restorative rest/relaxation | Integer 0–10 |
-| reported_strain | How strained the person felt | Integer 0–10, or explicit null |
+| sleep_hours | Sleep ending on the observation date | 0-12 hours, steps of 0.25 |
+| academic_load | Total academic demand | Integer 0-10 |
+| deadline_pressure | Urgency/difficulty of meeting deadlines | Integer 0-10 |
+| screen_hours | Total screen use, overlapping use counted once | 0-16 hours, steps of 0.25 |
+| extracurricular_load | Other, nonacademic commitments | Integer 0-10 |
+| recovery | Opportunity for restorative rest/relaxation | Integer 0-10 |
+| reported_strain | How strained the person felt | Integer 0-10, or explicit null |
 
 Deadline pressure separates urgency from workload. Recovery adds a description of restorative downtime beyond sleep duration. Neither addition establishes predictive value. Other commitments already captures social/personal demand, so there is no extra duplicate field. No focus/energy field was added.
 
@@ -44,7 +46,7 @@ The gaps between output sets are intentional. Inputs, not output labels, need co
 
 ### Full rule tables
 
-Rows are the first input's low/medium/high terms; columns are the second input's low/medium/high terms. Each cell is the consequent. IDs use `component:rowcolumn`, numbered 1–3. For example `academic_pressure:13` means workload low AND deadline high → academic pressure high. All rule weights are 1.
+Rows are the first input's low/medium/high terms; columns are the second input's low/medium/high terms. Each cell is the consequent. IDs use `component:rowcolumn`, numbered 1-3. For example `academic_pressure:13` means workload low AND deadline high → academic pressure high. All rule weights are 1.
 
 Academic pressure: workload × deadline pressure
 
@@ -80,7 +82,7 @@ For each component:
 2. Rule strength = membership of first antecedent × membership of second antecedent.
 3. Scale the consequent fuzzy set pointwise by the rule strength (product implication, not clipping).
 4. Sum these scaled sets across the nine rules.
-5. Calculate the area centroid using scikit-fuzzy over the 0–100 universe at 0.1 spacing.
+5. Calculate the area centroid using scikit-fuzzy over the 0-100 universe at 0.1 spacing.
 
 Since each input partition sums to 1, the nine rule strengths sum to 1. The aggregate is a convex combination of fuzzy sets and cannot exceed membership 1. Every output triangle has the same area and is symmetric, so its centroid is also the weighted mean of the consequent centers under those strengths. The runtime computes the actual aggregate and centroid; the numerical equivalence provides an independent check.
 
@@ -90,7 +92,7 @@ This choice avoids counterintuitive dips found in the initial min/max prototype.
 
 `raw_score = 0.45 × academic_centroid + 0.40 × recovery_deficit_centroid + 0.15 × contextual_centroid`.
 
-Only the final result is rounded, to one decimal with decimal HALF_UP. Existing category cutoffs are applied to that rounded score: <25 Very low, <45 Low, <65 Moderate, <85 High, otherwise Very high. These are heuristic index bands, not diagnoses, probabilities or calibrated stress levels. Components and the final index are bounded by 15–85; 0/100 are not reachable, and Very high occurs only near the upper rounded limit.
+Only the final result is rounded, to one decimal with decimal HALF_UP. Existing category cutoffs are applied to that rounded score: <25 Very low, <45 Low, <65 Moderate, <85 High, otherwise Very high. These are heuristic index bands, not diagnoses, probabilities or calibrated stress levels. Components and the final index are bounded by 15-85; 0/100 are not reachable, and Very high occurs only near the upper rounded limit.
 
 For sleep 6, workload 5, deadline 5, screen 8, commitments 5 and recovery 5, each component centroid is 50. Contributions are 22.5 + 20 + 7.5 = 50.0 (Moderate). Strain may be 0, 10 or skipped with exactly the same calculation.
 

@@ -55,6 +55,8 @@ def test_save_and_retry_return_exact_committed_snapshot(signed_in, db):
     assert result['assessment']['score'] == fuzzy.evaluate(result['inputs'])['score']
     assert result['inputs']['reported_strain'] == 6
     assert result['assessment'] == fuzzy.evaluate(result['inputs'])
+    assert 1 <= len(result['guidance']) <= 3
+    assert all(item['policy_version'] == 'guidance-1.0.0' for item in result['guidance'])
     second = save(client, key=key)
     assert second.status_code == 200 and second.json() == result
     assert second.headers['Idempotency-Replayed'] == 'true'
@@ -65,14 +67,36 @@ def test_save_and_retry_return_exact_committed_snapshot(signed_in, db):
     assert client.get('/api/check-ins/' + result['id']).json() == result
 
 
-def test_payload_key_reuse_and_second_daily_save_conflict(signed_in):
+def test_payload_key_reuse_conflicts_but_second_daily_save_updates(signed_in):
     client, _ = signed_in
     key = uuid4()
     assert save(client, key=key).status_code == 201
     changed = payload()
     changed['sleep_hours'] = 8
     assert save(client, changed, key).json()['error']['code'] == 'idempotency_conflict'
-    assert save(client).json()['error']['code'] == 'daily_checkin_exists'
+    updated = save(client, changed)
+    assert updated.status_code == 200
+    assert updated.json()['revision'] == 2
+    assert updated.json()['inputs']['sleep_hours'] == 8
+
+
+def test_daily_overwrite_preserves_revisions_and_retry_does_not_revert_latest(signed_in, db):
+    client, user = signed_in
+    first = save(client).json()
+    changed = {**payload(), 'sleep_hours': 9, 'academic_load': 9}
+    key = uuid4()
+    second = save(client, changed, key).json()
+    third = save(client, {**changed, 'sleep_hours': 4}).json()
+    assert first['id'] == second['id'] == third['id']
+    assert third['revision'] == 3
+    assert save(client, changed, key).json() == second
+    assert client.get('/api/check-ins/' + first['id']).json() == third
+    assert client.get('/api/check-ins').json()['items'] == [third]
+    assert db.scalar(select(func.count()).select_from(CheckIn)) == 1
+    assert db.scalar(select(func.count()).select_from(CheckInRevision)) == 3
+    assert third['assessment'] == fuzzy.evaluate(third['inputs'])
+    db.refresh(user)
+    assert user.history_version == 3
 
 
 def test_edit_keeps_old_revision_and_rejects_stale_write(signed_in, db):
@@ -168,6 +192,24 @@ def test_concurrent_same_key_creates_only_one_observation(signed_in, db):
     assert sorted(status for status, _ in results) == [200, 200, 200, 201]
     assert all(result == results[0][1] for _, result in results)
     assert db.scalar(select(func.count()).select_from(CheckInRevision)) == 1
+
+
+def test_concurrent_daily_saves_keep_last_committed_revision(signed_in, db):
+    original, _ = signed_in
+    def request(hours):
+        with TestClient(original.app, base_url='http://localhost') as client:
+            client.cookies.update(original.cookies)
+            client.headers.update({'Origin': ORIGIN, 'X-CSRF-Token': original.headers['X-CSRF-Token']})
+            response = save(client, {**payload(), 'sleep_hours': hours})
+            assert response.status_code in (200, 201)
+            return response.json()
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        results = list(pool.map(request, [4, 7, 9]))
+    assert sorted(item['revision'] for item in results) == [1, 2, 3]
+    latest = max(results, key=lambda item: item['revision'])
+    assert original.get('/api/check-ins').json()['items'] == [latest]
+    assert db.scalar(select(func.count()).select_from(CheckIn)) == 1
+    assert db.scalar(select(func.count()).select_from(CheckInRevision)) == 3
 
 
 def test_database_checks_prevent_invalid_rating(signed_in, db):

@@ -62,6 +62,16 @@ def _oidc_configured() -> bool:
     return bool(settings.oidc_client_id and settings.oidc_client_secret)
 
 
+def _frontend_redirect(outcome: str) -> RedirectResponse:
+    # An explicit destination query prevents proxy query-string passthrough.
+    # This marker carries no identity or authorization data; the SPA removes it.
+    origin = str(get_settings().frontend_origin).rstrip("/")
+    marker = "signed_in=1" if outcome == "success" else "sign_in=" + ("cancelled" if outcome == "cancelled" else "failed")
+    response = RedirectResponse(f"{origin}/?{marker}", status_code=303)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @lru_cache(maxsize=1)
 def _oidc_client():
     settings = get_settings()
@@ -253,7 +263,12 @@ async def oidc_callback(request: Request, db: DatabaseSession = Depends(get_db))
     actual_state = request.query_params.get("state", "")
     age = _now().timestamp() - started_at if isinstance(started_at, (int, float)) else -1
     if (
-        not isinstance(expected_state, str)
+        len(request.query_params.getlist('state')) != 1
+        or (('error' in request.query_params) and (len(request.query_params.getlist('error')) != 1 or not request.query_params['error'] or 'code' in request.query_params))
+        or (('error' not in request.query_params) and (len(request.query_params.getlist('code')) != 1 or not 1 <= len(request.query_params.get('code', '')) <= 4096))
+        or len(request.query_params.getlist('iss')) > 1
+        or ('iss' in request.query_params and request.query_params['iss'] not in GOOGLE_ISSUERS)
+        or not isinstance(expected_state, str)
         or not isinstance(expected_nonce, str)
         or len(actual_state) > 256
         or not secrets.compare_digest(expected_state.encode(), actual_state.encode())
@@ -261,6 +276,11 @@ async def oidc_callback(request: Request, db: DatabaseSession = Depends(get_db))
     ):
         request.session.clear()
         raise ApiError(400, "AUTHENTICATION_FAILED", "The sign-in attempt expired or could not be verified.")
+    # Validate the login transaction even when consent is declined. Never reflect
+    # provider descriptions or exchange a token on this path.
+    if 'error' in request.query_params:
+        request.session.clear()
+        return _frontend_redirect('cancelled' if request.query_params['error'] == 'access_denied' else 'failed')
     try:
         token = await _oidc_client().authorize_access_token(
             request,
@@ -291,7 +311,7 @@ async def oidc_callback(request: Request, db: DatabaseSession = Depends(get_db))
         request.session.clear()
         raise ApiError(400, "AUTHENTICATION_FAILED", "Sign-in could not be verified. Please try again.") from None
     request.session.clear()
-    response = RedirectResponse(str(get_settings().frontend_origin).rstrip("/"), status_code=303)
+    response = _frontend_redirect("success")
     await run_in_threadpool(_start_session, request, response, db, GOOGLE_ISSUER, subject, claims)
     return response
 
